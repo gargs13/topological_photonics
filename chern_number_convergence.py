@@ -57,6 +57,7 @@ def make_regular_polygon(n, x_centre=0, y_centre=0, radial=False, radial_distanc
     #print(vertices)
     return vertices
 
+
 def initialize_lattice_parameters(a, numG):
     a=a
     numG=numG
@@ -66,7 +67,7 @@ def initialize_lattice_parameters(a, numG):
     B1=2*np.pi/a *np.array([1, 1/np.sqrt(3)])
     B2=2*np.pi/a *np.array([1, -1/np.sqrt(3)])
     
-    return a, c0, numG, B1, B2
+    return a, c0, B1, B2
 
 def initialize_hole_parameters(a, ratio_1, ratio_2):
     l1=a*ratio_1
@@ -112,7 +113,7 @@ def one_unit_cell (n, a, a1, a2, x_centre_1=0, y_centre_1=0, x_centre_2=0, y_cen
     unit = unit.union(translate(unit,  a/2, a*np.sqrt(3)/2))
     unit = unit.union(translate(unit, -a/2, a*np.sqrt(3)/2))
     unit = translate(unit, 0, -np.sqrt(3)*a/2)
-
+    '''
     fig, ax = plt.subplots(figsize=(6, 6))
     if unit.geom_type == 'Polygon':
         x, y = unit.exterior.xy
@@ -128,7 +129,7 @@ def one_unit_cell (n, a, a1, a2, x_centre_1=0, y_centre_1=0, x_centre_2=0, y_cen
     ax.grid(True, linestyle='--', alpha=0.4)
             
     plt.show()
-    
+    '''
     return unit
 
 
@@ -162,7 +163,7 @@ def dielectric_function(ed, ea, unit, a, x_start, x_end, y_start, y_end, toleran
     is_inside_vec = np.vectorize(is_inside_unit_polygon)
     eps = np.where(is_inside_vec(xi, yi), ea, ed)
     inv_eps=1/eps
-    
+    '''
     plt.close()
     plt.figure(figsize=(8, 6))
     if (rhombus==True):
@@ -175,7 +176,7 @@ def dielectric_function(ed, ea, unit, a, x_start, x_end, y_start, y_end, toleran
     plt.colorbar(label=r'$\epsilon(x, y)$')
     plt.title('Spatial Dielectric Distribution')
     plt.show()
-
+    '''
     return inv_eps, xi, yi
 
 def specify_dielectric_function_rectangle(a, unit):
@@ -218,7 +219,7 @@ def specify_dielectric_function_rectangle(a, unit):
     inv_exy = 1 / exy
     print(inv_exy[len(inv_exy)//2])
     exy_reshaped_1 = inv_exy.reshape(N1.shape, order = 'F')
-    
+    '''
     plt.close()
     plt.figure(figsize=(8, 6))
     plt.axes().set_aspect(0.5)
@@ -228,6 +229,7 @@ def specify_dielectric_function_rectangle(a, unit):
     plt.colorbar(label=r'$\epsilon(x, y)$')
     plt.title('Spatial Dielectric Distribution')
     plt.show()
+    '''
     return xi, yi, inv_exy
 
 def fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_eps):
@@ -249,7 +251,7 @@ def fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_eps):
        chi[i] = np.sum(inv_eps * np.exp(-1j * phi)) / ni
 
     chi_matrix = chi.reshape(M.shape, order='F')
-    
+    '''
     # Plot chi(G)
     plt.figure()
     plt.imshow(np.abs(chi_matrix), extent=[-m_max-0.5, m_max+0.5, -n_max-0.5, n_max+0.5],
@@ -258,7 +260,7 @@ def fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_eps):
     plt.title('Chi(G) Matrix')
     plt.set_cmap('jet')
     plt.show()
-
+'''
     
     #reshaping it
     mp = np.arange(-ng, ng + 1)
@@ -278,7 +280,7 @@ def fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_eps):
         chi_p.append(chi[crop])
 
     chi_p = np.column_stack(chi_p)
-
+    '''
     # Plot Chi(G-G')
     plt.figure()
     plt.imshow(np.abs(chi_p), norm=matplotlib.colors.LogNorm())
@@ -287,84 +289,8 @@ def fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_eps):
     plt.colorbar(label=r'$\chi(G-G)$')
     plt.title("Chi(G-G') Matrix")
     plt.show()
-
+    '''
     return chi_p, chi, M_lin, N_lin, Mp_lin, Np_lin
-
-
-
-def eig_val_band_structure(a, numG, B1, B2, chi_p):
-    #high symmetry points
-    G = np.array([0, 0])
-    M = np.array([0, (2 * np.pi / a * (1 / 3) * (np.sqrt(3)))])
-    K = np.array([2 * np.pi / a * (-1/3), (2 * np.pi / a * (1 / 3) * (np.sqrt(3)))])
-    N1=N2=N3=100
-    
-    kx = np.concatenate([np.linspace(G[0], M[0], N1, endpoint=False), np.linspace(M[0], K[0], N2, endpoint=False),
-                        np.linspace(K[0], G[0], N3)])
-    ky = np.concatenate([np.linspace(G[1], M[1], N1, endpoint=False), np.linspace(M[1], K[1], N2, endpoint=False),
-                        np.linspace(K[1], G[1], N3)])
-    
-    
-    
-    Gx = np.array([])
-    Gy = np.array([]) #why again, why is this different?
-    for i in range(-numG,numG+1):
-        for j in range(-numG,numG+1):
-            Gx = np.append(Gx,(i*B1[0]+j*B2[0]))
-            Gy = np.append(Gy,(i*B1[1]+j*B2[1]))
-    
-    G = np.array([Gx,Gy]).T
-    numG = len(G)
-
-    
-    # Precompute the G matrix components for easier access and broadcasting
-    Gx = G[:, 0].reshape(1, numG)  
-    Gy = G[:, 1].reshape(1, numG)
-    
-    # Expand kx and ky for broadcasting with G
-    kx_expanded = kx[:, np.newaxis]  # Shape (len(kx), 1)
-    ky_expanded = ky[:, np.newaxis]  # Shape (len(kx), 1)
-    
-    # Precompute the components of the matrix multiplication
-    kx_term = kx_expanded + Gx  # Shape (len(kx), numG)
-    ky_term = ky_expanded + Gy  # Shape (len(kx), numG)
-    
-    kx_term_outer = kx_term[:, :, np.newaxis] * kx_term[:, np.newaxis, :]  # Shape (len(kx), numG, numG)
-    ky_term_outer = ky_term[:, :, np.newaxis] * ky_term[:, np.newaxis, :]  # Shape (len(kx), numG, numG)
-
-    # Combine the kx and ky terms
-    combined_terms = kx_term_outer + ky_term_outer  # Shape (len(kx), numG, numG)
-
-    # Finally, compute the M matrix using broadcasting and element-wise multiplication
-    M = chi_p[np.newaxis, :, :] * combined_terms  # Shape (len(kx), numG, numG)
-                
-    # Eigen-states computation
-    dispe = np.zeros((numG, len(kx)))
-    for countK in range(len(kx)):
-        MM = M[countK, :, :]
-        eigenvalues, eigenvectors = np.linalg.eig(MM)
-        dispe[:, countK] = np.sqrt(np.sort(np.real(eigenvalues))) * a / (2 * np.pi)
-
-    # Plotting the band structure
-    plt.figure()
-    ax1 = plt.gca()
-    for u in range(7):
-        plt.plot(np.abs(dispe[u, :]), 'r', linewidth=1)
-        if min(dispe[u + 1, :]) > max(dispe[u, :]):
-            rect_height = min(dispe[u + 1, :]) - max(dispe[u, :])
-            rect = Rectangle((0, max(dispe[u, :])), N1 + N2 + N3, rect_height, facecolor='lightblue')
-            ax1.add_patch(rect)
-
-    # Labeling the axes+
-    plt.title('Band Structure')
-    plt.xticks([0, N1, N1 + N2, N1 + N2 + N3], ['G', 'M', 'K', 'G'])
-    plt.ylabel('Frequency ωa/2πc', fontsize=16)
-    plt.xlabel('Wavevector', fontsize=16)
-    plt.ylim([0, 0.7])
-    plt.xlim([0, N1+N2+N3])
-    plt.grid(True)
-    plt.show()
-    return eigenvalues, eigenvectors, dispe, G, Gx, Gy, numG
 
 
 #1'       
@@ -547,90 +473,25 @@ def plot_berry_curvature(F, KX, KY, a, Gamma, M, K, vertices):
     plt.colorbar()
     plt.clim(-np.max(np.abs(np.real(F))), np.max(np.abs(np.real(F))))
     plt.show()
-    
-def chern_number_calculation_rectangle_area(F, KX, KY, a, del_S, dx, dy):
-
-    #calculates the Chern number contribution from the Berry curvature 
-    #near two high-symmetry points  (K->positive corner of BZ, K'->negative)
-    # Parameters for Area of Integration
-    dx = dx
-    dy = dy
-    # Define the region of interest around the K point
-    kx_min = (2 * np.pi / a * (1 / 3)) - ((2 * np.pi / a) * dx)
-    kx_max = (2 * np.pi / a * (1 / 3)) + ((2 * np.pi / a) * dx)
-    ky_min = (2 * np.pi / a * ((1 / np.sqrt(3))+0.01)) - ((2 * np.pi / a) * (dy))
-    ky_max = (2 * np.pi / a * ((1 / np.sqrt(3))+0.01)) + ((2 * np.pi / a) * (dy))
-    
-    # Plotting Berry curvature
-    plt.figure()
-    plt.title("Berry Curvature")
-    plt.imshow(np.real(F), extent=(KX[0, 0] * a / (2 * np.pi), KX[0, -1] * a / (2 * np.pi),
-                                KY[0, 0] * a / (2 * np.pi), KY[-1, 0] * a / (2 * np.pi)), 
-            cmap='bwr', aspect='auto')
-    # # Create a rectangle patch
-    rect_K = Rectangle(((kx_min * a / (2 * np.pi)), (ky_min * a / (2 * np.pi))), 
-                    2*dx, 2*dy, fill=False, edgecolor='red', linewidth=1)
-    plt.gca().add_patch(rect_K)
-    plt.text((kx_min * a / (2 * np.pi)), (ky_max * a / (2 * np.pi)) + 0.05, 'K', color='red', fontsize=12)
-    # Identify the indices within the rectangle
-    indices = np.where((KX >= kx_min) & (KX <= kx_max) & (KY >= ky_min) & (KY <= ky_max))
-    # Extract the values of F within the rectangle
-    F_within_rectangle = (F[indices])
-    # Perform the integration (sum)
-    chern_number_K = (1 / (2 *np.pi)) * np.sum((F_within_rectangle * del_S))
-
-
-    # Define the region of interest around the K' point
-    kx_min = (2 * np.pi / a * (-1 / 3)) - ((2 * np.pi / a) * dx)
-    kx_max = (2 * np.pi / a * (-1 / 3)) + ((2 * np.pi / a) * dx)
-    ky_min = (2 * np.pi / a * ((1 / np.sqrt(3))+0.01)) - ((2 * np.pi / a) * (dy))
-    ky_max = (2 * np.pi / a * ((1 / np.sqrt(3))+0.01)) + ((2 * np.pi / a) * (dy))
-    
-    rect_K_prime = Rectangle(((kx_min * a / (2 * np.pi)), (ky_min * a / (2 * np.pi))), 
-                    2*dx, 2*dy, fill=False, edgecolor='blue', linewidth=1)
-    plt.gca().add_patch(rect_K_prime)
-    plt.text((kx_min * a / (2 * np.pi)), (ky_max * a / (2 * np.pi)) + 0.05, "K'", color='blue', fontsize=12)
-    plt.xlabel('kx a/2π')
-    plt.ylabel('ky a/2π')
-    plt.colorbar()
-    plt.clim(-np.max(np.abs(np.real(F))), np.max(np.abs(np.real(F))))
-    plt.show()
-
-    # Identify the indices within the rectangle
-    indices = np.where((KX >= kx_min) & (KX <= kx_max) & (KY >= ky_min) & (KY <= ky_max))
-    # Extract the values of F within the rectangle
-    F_within_rectangle = (F[indices])
-    # Perform the integration (sum)
-    chern_number_K_prime = (1 / (2 *np.pi)) * np.sum((F_within_rectangle * del_S))
-
-   # print(f"Chern number (K): {chern_number_K}")
-   # print(f"Chern number (K'): {chern_number_K_prime}")
-    
-    return chern_number_K, chern_number_K_prime
 
 def chern_number_calculation_polygon_area(F, KX, KY, a, del_S, vertices_1, vertices_2, kx_center_K, ky_center_K, kx_center_K_prime, ky_center_K_prime):
-    #vertices_1: arrays of coords around K
-    #  ......_2: ........................K'
     def is_point_in_polygon(x, y, polygon): 
         path = Path(polygon)
         return path.contains_point((x, y))
 
     def calculate_chern_number(F, KX, KY, vertices): 
-    #Finds all grid indices within the polygon, extracts the Berry curvature, and sums it.
-        # Identify the indices within the polygon
         indices = []
         for i in range(KX.shape[0]):
             for j in range(KX.shape[1]):
                 if is_point_in_polygon(KX[i, j], KY[i, j], vertices):
-                    indices.append((i, j))
+                    indices.append(np.array([i, j]))
         indices = np.array(indices)
-        
-        # Extract the values of F within the polygon
-        F_within_polygon = (F[indices[:, 0], indices[:, 1]])
-        
-        # Perform the integration (sum)
-        return (1 / (2 * np.pi)) * np.sum(F_within_polygon * del_S)
 
+        F_within_polygon=np.array([])
+        for each in indices:
+            F_within_polygon=np.append(F_within_polygon, F[each[0], each[1]])
+        return (1 / (2 * np.pi)) * np.sum(F_within_polygon * del_S)
+    '''
     # Plotting Berry curvature
     plt.figure()
     plt.title("Berry Curvature")
@@ -653,46 +514,15 @@ def chern_number_calculation_polygon_area(F, KX, KY, a, del_S, vertices_1, verti
     plt.ylabel('ky a/2π')
     plt.colorbar()
     plt.clim(-np.max(np.abs(np.real(F))), np.max(np.abs(np.real(F))))
-    plt.show()
-
-    # Calculate Chern number for the polygon area
+    #plt.show()
+    '''
     chern_number_K = calculate_chern_number(F, KX, KY, vertices_1)
     chern_number_K_prime = calculate_chern_number(F, KX, KY, vertices_2)
 
     return chern_number_K, chern_number_K_prime
+#
 
-
-'''
-no_of_simulations = 24
-chern_number_K = np.zeros(no_of_simulations)
-chern_number_K_prime = np.zeros(no_of_simulations)
-for simulation_index in range(no_of_simulations):
-    if simulation_index == 23:
-        l2 = (0.01 * (simulation_index)) - 0.001
-    else:
-        l2 = 0.01 * (simulation_index)
-    a, c0, ng, B1, B2 = initialize_lattice_parameters(a=242.5 * 10**(-6), numG=3)
-    l1, l2 = initialize_hole_parameters(a, ratio_1=0.23, ratio_2=l2)
-    unit = one_unit_cell(n=100,a=a, a1=l1, a2=l2, radial=True, ) 
-    xi, yi, X, Y, inv_exy = dielectric_function(1, 9, unit, a, 100, 0, 1, -0.5, 0.5)
-    xi, yi, X, Y, inv_exy = dielectric_function(1, 9, unit, a, 100, -0.5, 0.5, -0.5, 0.5)
-    khi_G_Gp, khiG, M_lin, N_lin, Mp_lin, Np_lin = fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_exy)
-    
-    eigenvalues, eigenvectors, dispe_1D, G, Gx, Gy, numG = eig_val_band_structure(a, ng, B1, B2, khi_G_Gp)
-    N_BZ, kx, ky, KX, KY, KX_lin, KY_lin, delta_kx, delta_ky, band_index, del_S = initialize_BZ_parameters(a, numG, N_BZ=50, band_index=1)
-    n = band_index
-    F, H, dispe = compute_berry_curvature(n, KX, KY, del_S, compute_eigenstates_and_eigenfrequencies, N_BZ, Mp_lin, Np_lin, B1, B2, khi_G_Gp, a, numG)
-    dispe_reshaped = dispe.reshape((numG, 2 * N_BZ, 2 * N_BZ), order='C')
-    Gamma, M, K, vertices = high_symmetry_points()
-    plot_band_structure(dispe_reshaped, KX, KY, a, Gamma, M, K, vertices)
-    plot_3D_Band_Structure(dispe_reshaped)
-    plot_berry_curvature(F, KX, KY, a, Gamma, M, K, vertices)
-    chern_number_K[simulation_index], chern_number_K_prime[simulation_index] = chern_number_calculation_rectangle_area(F, KX, KY, a, del_S)
-    r_b_values = np.arange(0, 0.23 + 0.01, 0.01)
-    plot_chern_number_variation(chern_number_K, chern_number_K_prime, r_b_values)
-'''
-
-a, c0, ng, B1, B2 = initialize_lattice_parameters(a=242.5 * 10**(-6), numG=3)
+a, c0, B1, B2 = initialize_lattice_parameters(a=242.5 * 10**(-6), numG=5)
 l1, l2 = initialize_hole_parameters(a, ratio_1=0.65, ratio_2=0.35)
 seperation = 0 * a
 # rotation_angle = np.pi / 10
@@ -703,41 +533,70 @@ unit = one_unit_cell(n=3, a=a, a1=l1, a2=l2, radial=False)
 xi, yi, inv_exy = dielectric_function(ed=9, ea=1, unit=unit, a=a, x_start=-1, x_end=0, y_start=0, y_end=0.5, tolerance=1e-8*a)
 xi, yi, inv_exy = dielectric_function(ed=9, ea=1, unit=unit, a=a, x_start=-0.5, x_end=0.5, y_start=-0.5, y_end=0.5, rhombus=False, tolerance=1e-8*a)
 xi, yi, inv_exy=specify_dielectric_function_rectangle(a, unit)
-khi_G_Gp, khiG, M_lin, N_lin, Mp_lin, Np_lin= fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_exy)
-eigenvalues, eigenvectors, dispe_1D, G, Gx, Gy, numG = eig_val_band_structure(a, ng, B1, B2, khi_G_Gp)
 
-N=np.arange(1, 20)
+#N_G=np.arange(6, 8)
+#N=np.arange(5, 20, 2)
+
+#(0.24215403655920903, -0.24214048167701763) N=7
+#(0.23982359313725737, -0.23964272102203918) 
+ng=5
+N=np.arange(2, 50)
+#N=np.array([12])
+
 chern_k=[]
 chern_k1=[]
+error=[]
 
+Gamma, M, K, vertices = high_symmetry_points()
+dx=0.25
+dy=0.25
+K=K*np.pi/a
+K_prime=np.array([-K[0], K[1]])
+rad=np.linalg.norm(K-Gamma)
+vertices_1=make_regular_polygon(3, K[0], K[1], True, rad, 0, np.pi/2)
+vertices_1=np.vstack((vertices_1, vertices_1[0]))
+vertices_2=make_regular_polygon(3, K_prime[0], K_prime[1], True, rad, 0, -np.pi/2)
+vertices_2=np.vstack((vertices_2, vertices_2[0]))
+
+
+# for ng in N:
+
+khi_G_Gp, khiG, M_lin, N_lin, Mp_lin, Np_lin= fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_exy)
+numG=(2*ng+1)**2
 for N_BZ in N:
+    print(N_BZ)
     kx, ky, KX, KY, KX_lin, KY_lin, delta_kx, delta_ky, band_index, del_S = initialize_BZ_parameters(a, numG, N_BZ, band_index=1)
     n = band_index
     F, H, dispe = compute_berry_curvature(n, KX, KY, del_S, compute_eigenstates_and_eigenfrequencies, N_BZ, Mp_lin, Np_lin, B1, B2, khi_G_Gp, a, numG)
     dispe_reshaped = dispe.reshape((numG, 2 * N_BZ, 2 * N_BZ), order='C')
-    Gamma, M, K, vertices = high_symmetry_points()
     #plot_band_structure(dispe_reshaped, KX, KY, a, Gamma, M, K, vertices)
     #plot_3D_Band_Structure(dispe_reshaped)
     #plot_berry_curvature(F, KX, KY, a, Gamma, M, K, vertices)
-
-    dx=0.25
-    dy=0.25
-    K=K*np.pi
-    K_prime=-K
-    vertices_1=make_regular_polygon(3, K[0], K[1], False, 0, a, )
-    vertices_2=make_regular_polygon()
     #chernk, chernk1=chern_number_calculation_rectangle_area(F, KX, KY, a, del_S, dx, dy)
-    chernk, chernk1=chern_number_calculation_polygon_area(F, KX, KY, a, del_S, vertices_1, vertices_2, K[0], K[1], K_prime[0], K_prime[1])
-    print(N_BZ)
+    chernk, chernk1=chern_number_calculation_polygon_area(F, KX, KY, a, del_S, vertices_2, vertices_1, K[0], K[1], K_prime[0], K_prime[1])
     chern_k.append(chernk)
     chern_k1.append(chernk1)
+    print(f"{chernk, chernk1}")
+    error.append(chernk+chernk1)
+
+
+print(chern_k)
+print(chern_k1)
 
 plt.plot(N, chern_k, color='red')
-plt.plot(N, chern_k1, color='blue')
-plt.xlabel("number of k points")
-plt.ylabel("chern number")
+#plt.xlabel("k-mesh grid division")
+plt.ylabel("chern number at K")
 plt.show()
 
+plt.plot(N, chern_k1, color='blue')
+#plt.xlabel("k-mesh grid division")
+plt.ylabel("chern number at K'")
+plt.show()
+
+plt.plot(N, error, color='green')
+zer=np.zeros(N.size)
+plt.plot(N, zer, color='black')
+plt.plot()
 '''
 radius = 2 * np.pi / a * (2 / 3)
 # Define the region of interest around the K point

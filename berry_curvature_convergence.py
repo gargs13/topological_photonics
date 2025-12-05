@@ -207,8 +207,6 @@ def specify_dielectric_function_rectangle(a, unit, N_sp):
     '''
     return xi, yi, inv_exy, exy
 
-
-
 def fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_eps):
     m_max, n_max = 2 * ng, 2 * ng
     m = np.arange(-m_max, m_max + 1)
@@ -270,107 +268,32 @@ def fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_eps):
 '''
     return chi_p, chi, M_lin, N_lin, Mp_lin, Np_lin
 
-def verify_dielectric(chi, M_lin, N_lin, xi, yi):
+def verify_dielectric(chi, M_lin, N_lin, xi, yi, B1, B2):
+    
     G_len=len(M_lin)
     ni=len(xi)
-    inv_ft=np.zeros(ni, dtype=complex)
+
+    ft = np.zeros(ni, dtype=complex)
+
     for j in range(ni):
         x = xi[j]
         y = yi[j]
         phi = (B1[0]*M_lin + B2[0]*N_lin) * x + (B1[1]*M_lin + B2[1]*N_lin) * y
-        inv_ft[j] = np.sum(chi.flatten(order='F') * np.exp(1j * phi))
+        ft[j] = np.sum(chi.flatten(order='C') * np.exp(1j * phi.flatten()))
+        #print(f"{j/ni*100}% done")
+    inv_eps_r = 1 / ft
 
 
-    i_ft_dielec=1/inv_ft
-    i_ft_dielec=np.real(i_ft_dielec)
     plt.figure(figsize=(8, 6))
     plt.axes().set_aspect(0.5)
-    plt.scatter(xi, yi, c=i_ft_dielec, s=1, cmap='jet')
+    plt.scatter(xi, yi, c=np.real(ft), s=1, cmap='jet')
     plt.xlabel('x [m]')
     plt.ylabel('y [m]')
-    plt.colorbar(label=r'$\epsilon(x, y)$')
-    plt.title('Spatial Dielectric Distribution')
+    plt.colorbar(label=r'$\epsilon^{-1}(x, y)$')
+    plt.title('Inverse Fourier of Dielectric Distribution')
     plt.show()
-
-
-'''
-def eig_val_band_structure(a, numG, B1, B2, chi_p):
-    #high symmetry points
-    G = np.array([0, 0])
-    M = np.array([0, (2 * np.pi / a * (1 / 3) * (np.sqrt(3)))])
-    K = np.array([2 * np.pi / a * (-1/3), (2 * np.pi / a * (1 / 3) * (np.sqrt(3)))])
-    N1=N2=N3=100
-    
-    kx = np.concatenate([np.linspace(G[0], M[0], N1, endpoint=False), np.linspace(M[0], K[0], N2, endpoint=False),
-                        np.linspace(K[0], G[0], N3)])
-    ky = np.concatenate([np.linspace(G[1], M[1], N1, endpoint=False), np.linspace(M[1], K[1], N2, endpoint=False),
-                        np.linspace(K[1], G[1], N3)])
-    
-    
-    
-    Gx = np.array([])
-    Gy = np.array([]) #why again, why is this different?
-    for i in range(-numG,numG+1):
-        for j in range(-numG,numG+1):
-            Gx = np.append(Gx,(i*B1[0]+j*B2[0]))
-            Gy = np.append(Gy,(i*B1[1]+j*B2[1]))
-    
-    G = np.array([Gx,Gy]).T
-    numG = len(G)
-
-    
-    # Precompute the G matrix components for easier access and broadcasting
-    Gx = G[:, 0].reshape(1, numG)  
-    Gy = G[:, 1].reshape(1, numG)
-    
-    # Expand kx and ky for broadcasting with G
-    kx_expanded = kx[:, np.newaxis]  # Shape (len(kx), 1)
-    ky_expanded = ky[:, np.newaxis]  # Shape (len(kx), 1)
-    
-    # Precompute the components of the matrix multiplication
-    kx_term = kx_expanded + Gx  # Shape (len(kx), numG)
-    ky_term = ky_expanded + Gy  # Shape (len(kx), numG)
-    
-    kx_term_outer = kx_term[:, :, np.newaxis] * kx_term[:, np.newaxis, :]  # Shape (len(kx), numG, numG)
-    ky_term_outer = ky_term[:, :, np.newaxis] * ky_term[:, np.newaxis, :]  # Shape (len(kx), numG, numG)
-
-    # Combine the kx and ky terms
-    combined_terms = kx_term_outer + ky_term_outer  # Shape (len(kx), numG, numG)
-
-    # Finally, compute the M matrix using broadcasting and element-wise multiplication
-    M = chi_p[np.newaxis, :, :] * combined_terms  # Shape (len(kx), numG, numG)
-                
-    # Eigen-states computation
-    dispe = np.zeros((numG, len(kx)))
-    for countK in range(len(kx)):
-        MM = M[countK, :, :]
-        eigenvalues, eigenvectors = np.linalg.eig(MM)
-        dispe[:, countK] = np.sqrt(np.sort(np.real(eigenvalues))) * a / (2 * np.pi)
-
-    # Plotting the band structure
-    plt.figure()
-    ax1 = plt.gca()
-    for u in range(7):
-        plt.plot(np.abs(dispe[u, :]), 'r', linewidth=1)
-        if min(dispe[u + 1, :]) > max(dispe[u, :]):
-            rect_height = min(dispe[u + 1, :]) - max(dispe[u, :])
-            rect = Rectangle((0, max(dispe[u, :])), N1 + N2 + N3, rect_height, facecolor='lightblue')
-            ax1.add_patch(rect)
-
-    # Labeling the axes+
-    plt.title('Band Structure')
-    plt.xticks([0, N1, N1 + N2, N1 + N2 + N3], ['G', 'M', 'K', 'G'])
-    plt.ylabel('Frequency ωa/2πc', fontsize=16)
-    plt.xlabel('Wavevector', fontsize=16)
-    plt.ylim([0, 0.7])
-    plt.xlim([0, N1+N2+N3])
-    plt.grid(True)
-    plt.show()
-    return eigenvalues, eigenvectors, dispe, G, Gx, Gy, numG
-'''
 
 #1'       
-
 def initialize_BZ_parameters(a, numG, num_BZ, band_index):
 
     kx = np.linspace(-2.4 * np.pi/a, 2.4 * np.pi/a, 2 * num_BZ) #wave vectors
@@ -441,7 +364,7 @@ def compute_berry_curvature(n, KX, KY, del_S, Hz_n_k, N_BZ, Mp_lin, Np_lin, B1, 
     #/delS to get curvature density
     return F, H, dispe
 
-
+'''
 def compute_berry_curvature_k(n, KX, KY, k1, k2, del_S, Hz_n_k, N_BZ, Mp_lin, Np_lin, B1, B2, khi_G_Gp, a, numG):
     
     ny, nx = KX.shape
@@ -482,6 +405,82 @@ def compute_berry_curvature_k(n, KX, KY, k1, k2, del_S, Hz_n_k, N_BZ, Mp_lin, Np
     #/delS to get curvature density
     U = np.zeros((ny - 1, nx - 1), dtype=complex)
     F = np.zeros((ny - 1, nx - 1), dtype=float)
+    U[j, i] = Uval
+    F[j, i] = Fval
+
+    return F, H, dispe, i, j
+'''
+
+def compute_berry_curvature_k(n, KX, KY, k1, k2, del_S, Hz_n_k,
+                              N_BZ, Mp_lin, Np_lin, B1, B2, khi_G_Gp, a, numG):
+    """
+    Computes Berry curvature for a given k-point using Wilson loop method,
+    ensuring double precision (float64 / complex128) throughout.
+    """
+
+    # ---- Enforce double precision on all inputs ----
+    KX = np.asarray(KX, dtype=np.float64)
+    KY = np.asarray(KY, dtype=np.float64)
+    B1 = np.asarray(B1, dtype=np.float64)
+    B2 = np.asarray(B2, dtype=np.float64)
+    khi_G_Gp = np.asarray(khi_G_Gp, dtype=np.complex128)
+    a = np.float64(a)
+    del_S = np.float64(del_S)
+
+    ny, nx = KX.shape
+
+    # ---- Identify plaquette corners ----
+    div_x = KX[0, :].astype(np.float64)
+    div_y = KY[:, 0].astype(np.float64)
+
+    i = np.argmin(np.abs(div_x - k1))
+    j = np.argmin(np.abs(div_y - k2))
+
+    k_corners = [
+        (KX[j, i],     KY[j, i]),
+        (KX[j+1, i],   KY[j+1, i]),
+        (KX[j+1, i+1], KY[j+1, i+1]),
+        (KX[j, i+1],   KY[j, i+1])
+    ]
+
+    # ---- Allocate arrays with explicit dtypes ----
+    dispe = np.zeros(numG, dtype=np.float64)
+    H = []
+
+    # ---- Collect eigenstates at each plaquette corner ----
+    for ka, kb in k_corners:
+        h, _ = Hz_n_k(n, (ka, kb), 1, Mp_lin, Np_lin, B1, B2, khi_G_Gp, a, dispe)
+        h = np.asarray(h, dtype=np.complex128)
+        H.append(h)
+
+    H = np.array(H, dtype=np.complex128)
+
+    # ---- Helper: normalized overlap ----
+    def normalized_overlap(a, b):
+        a = np.asarray(a, dtype=np.complex128)
+        b = np.asarray(b, dtype=np.complex128)
+        ov = np.vdot(a, b).astype(np.complex128)
+        mag = np.abs(ov)
+        if mag < 1e-15:
+            return np.complex128(1.0 + 0.0j)
+        return ov / mag
+
+    # ---- Compute link variables (Wilson loop) ----
+    U1 = normalized_overlap(H[0], H[1])
+    U2 = normalized_overlap(H[1], H[2])
+    U3 = normalized_overlap(H[2], H[3])
+    U4 = normalized_overlap(H[3], H[0])
+
+    Uval = np.complex128(U1 * U2 * U3 * U4)
+
+    # ---- Compute Berry curvature per plaquette ----
+    Fval = np.imag(np.log(Uval)).astype(np.float64) / del_S
+
+    # ---- Allocate full curvature arrays ----
+    U = np.zeros((ny - 1, nx - 1), dtype=np.complex128)
+    F = np.zeros((ny - 1, nx - 1), dtype=np.float64)
+
+    # ---- Store computed values ----
     U[j, i] = Uval
     F[j, i] = Fval
 
@@ -530,7 +529,6 @@ def compute_eigenstates_and_eigenfrequencies(n, k, i_index, Mp_lin, Np_lin, B1, 
     
     return Hznk, w_n
 
-
 def bwr(n):
     return np.interp(np.linspace(1, 3, n), [1, 2, 3], [[0, 0, 1], [1, 1, 1], [1, 0, 0]])
 
@@ -543,57 +541,6 @@ def high_symmetry_points():
     # Plot the triangle with the vertices G, M, and K
     vertices = np.array([Gamma, M, K, Gamma])  # Close the triangle by adding G at the end
     return Gamma, M, K, vertices
-
-
-
-
-'''
-def plot_band_structure(dispe_reshaped, KX, KY, a, Gamma, M, K, vertices):
-    plt.figure()
-    plt.imshow(dispe_reshaped[0,:], extent=(KX[0, 0] * a / (np.pi), KX[0, -1] * a / (np.pi),
-                                            KY[0, 0] * a / (np.pi), KY[-1, 0] * a / (np.pi)) 
-            ,cmap = 'viridis')
-    # Plot the triangle edges
-    plt.plot(vertices[:, 0], vertices[:, 1], color='white', linewidth=1)
-    plt.text(Gamma[0], Gamma[1], 'G', color='white', fontsize=12, va='top')
-    plt.text(M[0], M[1], 'M', color='white', fontsize=12, va='bottom')
-    plt.text(K[0], K[1], 'K', color='white', fontsize=12, va='bottom')
-
-    plt.xlabel('kx a/π')
-    plt.ylabel('ky a/π')
-    plt.colorbar(label="Frequency ωa/2πc")
-    plt.title("2D Band Structure (Lowest Band)")
-    plt.show()
-
-
-def plot_3D_Band_Structure(dispe_reshaped):
-
-    Z_1 = dispe_reshaped[0, :]  #lowest band at a fixed Kz
-    Z_2 = dispe_reshaped[1, :]  #second lowest band at a fixed Kz
-    Z_3 = dispe_reshaped[2, :]  #third lowest band at a fixed Kz
-    #meshgrid for Kx and Ky dimensions
-    Kx, Ky = np.meshgrid(np.arange(Z_1.shape[1]), np.arange(Z_1.shape[0]))
-
-    # Create a 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Plotting the surface
-    surface_1 = ax.plot_surface(Kx, Ky, Z_1, cmap='jet', vmin=0, vmax=0.45)
-    surface_2 = ax.plot_surface(Kx, Ky, Z_2, cmap='jet', vmin=0, vmax=0.45)
-    surface_3 = ax.plot_surface(Kx, Ky, Z_3, cmap='jet', vmin=0, vmax=0.5)
-
-    # Adding labels and title
-    ax.set_xlabel("Kx")
-    ax.set_ylabel("Ky")
-    ax.set_zlabel("Frequency ωa/2πc")
-    plt.title("3D Band Structure (2 Lowest Bands)")
-
-    # Add a color bar which maps values to colors
-    cbar = fig.colorbar(surface_1, ax=ax, pad=0.1)
-    cbar.set_label("Frequency ωa/2πc")
-'''
-
 
 def plot_berry_curvature(F, KX, KY, a, Gamma, M, K, vertices):
     
@@ -615,154 +562,8 @@ def plot_berry_curvature(F, KX, KY, a, Gamma, M, K, vertices):
     plt.show()
 
 
-'''  
-def chern_number_calculation_rectangle_area(F, KX, KY, a, del_S, dx, dy):
-
-    #calculates the Chern number contribution from the Berry curvature 
-    #near two high-symmetry points  (K->positive corner of BZ, K'->negative)
-    # Parameters for Area of Integration
-    dx = dx
-    dy = dy
-    # Define the region of interest around the K point
-    kx_min = (2 * np.pi / a * (1 / 3)) - ((2 * np.pi / a) * dx)
-    kx_max = (2 * np.pi / a * (1 / 3)) + ((2 * np.pi / a) * dx)
-    ky_min = (2 * np.pi / a * ((1 / np.sqrt(3))+0.01)) - ((2 * np.pi / a) * (dy))
-    ky_max = (2 * np.pi / a * ((1 / np.sqrt(3))+0.01)) + ((2 * np.pi / a) * (dy))
-    
-    # Plotting Berry curvature
-    plt.figure()
-    plt.title("Berry Curvature")
-    plt.imshow(np.real(F), extent=(KX[0, 0] * a / (2 * np.pi), KX[0, -1] * a / (2 * np.pi),
-                                KY[0, 0] * a / (2 * np.pi), KY[-1, 0] * a / (2 * np.pi)), 
-            cmap='bwr', aspect='auto')
-    # # Create a rectangle patch
-    rect_K = Rectangle(((kx_min * a / (2 * np.pi)), (ky_min * a / (2 * np.pi))), 
-                    2*dx, 2*dy, fill=False, edgecolor='red', linewidth=1)
-    plt.gca().add_patch(rect_K)
-    plt.text((kx_min * a / (2 * np.pi)), (ky_max * a / (2 * np.pi)) + 0.05, 'K', color='red', fontsize=12)
-    # Identify the indices within the rectangle
-    indices = np.where((KX >= kx_min) & (KX <= kx_max) & (KY >= ky_min) & (KY <= ky_max))
-    # Extract the values of F within the rectangle
-    F_within_rectangle = (F[indices])
-    # Perform the integration (sum)
-    chern_number_K = (1 / (2 *np.pi)) * np.sum((F_within_rectangle * del_S))
-
-
-    # Define the region of interest around the K' point
-    kx_min = (2 * np.pi / a * (-1 / 3)) - ((2 * np.pi / a) * dx)
-    kx_max = (2 * np.pi / a * (-1 / 3)) + ((2 * np.pi / a) * dx)
-    ky_min = (2 * np.pi / a * ((1 / np.sqrt(3))+0.01)) - ((2 * np.pi / a) * (dy))
-    ky_max = (2 * np.pi / a * ((1 / np.sqrt(3))+0.01)) + ((2 * np.pi / a) * (dy))
-    
-    rect_K_prime = Rectangle(((kx_min * a / (2 * np.pi)), (ky_min * a / (2 * np.pi))), 
-                    2*dx, 2*dy, fill=False, edgecolor='blue', linewidth=1)
-    plt.gca().add_patch(rect_K_prime)
-    plt.text((kx_min * a / (2 * np.pi)), (ky_max * a / (2 * np.pi)) + 0.05, "K'", color='blue', fontsize=12)
-    plt.xlabel('kx a/2π')
-    plt.ylabel('ky a/2π')
-    plt.colorbar()
-    plt.clim(-np.max(np.abs(np.real(F))), np.max(np.abs(np.real(F))))
-    plt.show()
-
-    # Identify the indices within the rectangle
-    indices = np.where((KX >= kx_min) & (KX <= kx_max) & (KY >= ky_min) & (KY <= ky_max))
-    # Extract the values of F within the rectangle
-    F_within_rectangle = (F[indices])
-    # Perform the integration (sum)
-    chern_number_K_prime = (1 / (2 *np.pi)) * np.sum((F_within_rectangle * del_S))
-
-    print(f"Chern number (K): {chern_number_K}")
-    print(f"Chern number (K'): {chern_number_K_prime}")
-    
-    return chern_number_K, chern_number_K_prime
-
-def chern_number_calculation_polygon_area(F, KX, KY, a, del_S, vertices_1, vertices_2, kx_center_K, ky_center_K, kx_center_K_prime, ky_center_K_prime):
-    #vertices_1: arrays of coords around K
-    #  ......_2: ........................K'
-    def is_point_in_polygon(x, y, polygon): 
-        path = Path(polygon)
-        return path.contains_point((x, y))
-
-    def calculate_chern_number(F, KX, KY, vertices): 
-    #Finds all grid indices within the polygon, extracts the Berry curvature, and sums it.
-        # Identify the indices within the polygon
-        indices = []
-        for i in range(KX.shape[0]):
-            for j in range(KX.shape[1]):
-                if is_point_in_polygon(KX[i, j], KY[i, j], vertices):
-                    indices.append((i, j))
-        indices = np.array(indices)
-        
-        # Extract the values of F within the polygon
-        F_within_polygon = (F[indices[:, 0], indices[:, 1]])
-        
-        # Perform the integration (sum)
-        return (1 / (2 * np.pi)) * np.sum(F_within_polygon * del_S)
-
-    # Plotting Berry curvature
-    plt.figure()
-    plt.title("Berry Curvature")
-    plt.imshow(np.real(F), extent=(KX[0, 0] * a / (2 * np.pi), KX[0, -1] * a / (2 * np.pi),
-                                   KY[0, 0] * a / (2 * np.pi), KY[-1, 0] * a / (2 * np.pi)),
-               cmap='bwr', aspect='auto')
-    
-    # Create a polygon patch for the region
-    polygon_patch_1 = poly(vertices_1 * (a / (2 * np.pi)), closed=True, fill=False, edgecolor='red', linewidth=1)
-   
-    plt.gca().add_patch(polygon_patch_1)
-    plt.text(kx_center_K * a / (2 * np.pi), ky_center_K * a / (2 * np.pi) + 0.05, 'K', color='red', fontsize=12)
-    
-    # Create a polygon patch for the region
-    polygon_patch_2 = poly(vertices_2 * (a / (2 * np.pi)), closed=True, fill=False, edgecolor='blue', linewidth=1)
-    plt.gca().add_patch(polygon_patch_2)
-    plt.text(kx_center_K_prime * a / (2 * np.pi), ky_center_K_prime * a / (2 * np.pi) + 0.05, "K'", color='blue', fontsize=12)
-
-    plt.xlabel('kx a/2π')
-    plt.ylabel('ky a/2π')
-    plt.colorbar()
-    plt.clim(-np.max(np.abs(np.real(F))), np.max(np.abs(np.real(F))))
-    plt.show()
-
-    # Calculate Chern number for the polygon area
-    chern_number_K = calculate_chern_number(F, KX, KY, vertices_1)
-    chern_number_K_prime = calculate_chern_number(F, KX, KY, vertices_2)
-
-    print(f"Chern number at K: {chern_number_K}")
-    print(f"Chern number at K': {chern_number_K_prime}")
-'''
-
-'''
-no_of_simulations = 24
-chern_number_K = np.zeros(no_of_simulations)
-chern_number_K_prime = np.zeros(no_of_simulations)
-for simulation_index in range(no_of_simulations):
-    if simulation_index == 23:
-        l2 = (0.01 * (simulation_index)) - 0.001
-    else:
-        l2 = 0.01 * (simulation_index)
-    a, c0, ng, B1, B2 = initialize_lattice_parameters(a=242.5 * 10**(-6), numG=3)
-    l1, l2 = initialize_hole_parameters(a, ratio_1=0.23, ratio_2=l2)
-    unit = one_unit_cell(n=100,a=a, a1=l1, a2=l2, radial=True, ) 
-    xi, yi, X, Y, inv_exy = dielectric_function(1, 9, unit, a, 100, 0, 1, -0.5, 0.5)
-    xi, yi, X, Y, inv_exy = dielectric_function(1, 9, unit, a, 100, -0.5, 0.5, -0.5, 0.5)
-    khi_G_Gp, khiG, M_lin, N_lin, Mp_lin, Np_lin = fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_exy)
-    
-    eigenvalues, eigenvectors, dispe_1D, G, Gx, Gy, numG = eig_val_band_structure(a, ng, B1, B2, khi_G_Gp)
-    N_BZ, kx, ky, KX, KY, KX_lin, KY_lin, delta_kx, delta_ky, band_index, del_S = initialize_BZ_parameters(a, numG, N_BZ=50, band_index=1)
-    n = band_index
-    F, H, dispe = compute_berry_curvature(n, KX, KY, del_S, compute_eigenstates_and_eigenfrequencies, N_BZ, Mp_lin, Np_lin, B1, B2, khi_G_Gp, a, numG)
-    dispe_reshaped = dispe.reshape((numG, 2 * N_BZ, 2 * N_BZ), order='C')
-    Gamma, M, K, vertices = high_symmetry_points()
-    plot_band_structure(dispe_reshaped, KX, KY, a, Gamma, M, K, vertices)
-    plot_3D_Band_Structure(dispe_reshaped)
-    plot_berry_curvature(F, KX, KY, a, Gamma, M, K, vertices)
-    chern_number_K[simulation_index], chern_number_K_prime[simulation_index] = chern_number_calculation_rectangle_area(F, KX, KY, a, del_S)
-    r_b_values = np.arange(0, 0.23 + 0.01, 0.01)
-    plot_chern_number_variation(chern_number_K, chern_number_K_prime, r_b_values)
-'''
-
 a, c0, B1, B2 = initialize_lattice_parameters(a=242.5 * 10**(-6))
-ng=9
+
 l1, l2 = initialize_hole_parameters(a, ratio_1=0.65, ratio_2=0.35)
 seperation = 0 * a
 # rotation_angle = np.pi / 10
@@ -772,21 +573,30 @@ rotation_angle = 0
 unit = one_unit_cell(n=3, a=a, a1=l1, a2=l2, radial=False)
 
 N_sp=100
-N=np.arange(30, 100, 2)
+#N=np.arange(5, 100)
+N=27
+N_BZ=50
 berry_curv_k=[]
 berry_curv_k1=[]
 
 
-xi, yi, inv_exy = dielectric_function(ed=9, ea=1, unit=unit, a=a, x_start=-1, x_end=0, y_start=0, y_end=0.5, tolerance=1e-8*a, N_sp=N_sp)
+inv_exy, xi, yi = dielectric_function(ed=9, ea=1, unit=unit, a=a, x_start=-1, x_end=0, y_start=0, y_end=0.5, tolerance=1e-8*a, N_sp=N_sp)
 #xi, yi, inv_exy = dielectric_function(ed=9, ea=1, unit=unit, a=a, x_start=-0.5, x_end=0.5, y_start=-0.5, y_end=0.5, rhombus=False, tolerance=1e-8*a)
 xi, yi, inv_exy, exy=specify_dielectric_function_rectangle(a, unit, N_sp)
-khi_G_Gp, khiG, M_lin, N_lin, Mp_lin, Np_lin= fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_exy)
+
+#NG=np.arange(10, 16)
+NG=np.array([5])
+for ng in NG:
+    print(ng)
+    khi_G_Gp, khiG, M_lin, N_lin, Mp_lin, Np_lin= fourier_coefficients_reshaped(a, ng, B1, B2, xi, yi, inv_exy)
 #eigenvalues, eigenvectors, dispe_1D, G, Gx, Gy, numG = eig_val_band_structure(a, ng, B1, B2, khi_G_Gp)
-print("50% done")
-verify_dielectric(khiG, M_lin, N_lin, xi, yi)
-print("verification done")
-numG=(2*ng+1)**2
-for N_BZ in N:
+    print("50% done")
+    verify_dielectric(khiG, M_lin, N_lin, xi, yi, B1, B2)
+#print("verification done")
+    numG=(2*ng+1)**2
+
+    #for N_BZ in N:
+    #print(f"{N_BZ}")
     kx, ky, KX, KY, KX_lin, KY_lin, delta_kx, delta_ky, band_index, del_S = initialize_BZ_parameters(a, numG, N_BZ, band_index=1)
     n = band_index
     #F, H, dispe = compute_berry_curvature(n, KX, KY, del_S, compute_eigenstates_and_eigenfrequencies, N_BZ, Mp_lin, Np_lin, B1, B2, khi_G_Gp, a, numG)
@@ -800,38 +610,23 @@ for N_BZ in N:
     k3, k4=(-K[0]*np.pi/a, K[1]*np.pi/a)
     F1, H1, dispe1, i1, j1=compute_berry_curvature_k(n, KX, KY, k1, k2, del_S, compute_eigenstates_and_eigenfrequencies, N_BZ,  Mp_lin, Np_lin, B1, B2, khi_G_Gp, a, numG)
     F2, H2, dispe2, i2, j2=compute_berry_curvature_k(n, KX, KY, k3, k4, del_S, compute_eigenstates_and_eigenfrequencies, N_BZ,  Mp_lin, Np_lin, B1, B2, khi_G_Gp, a, numG)
-    print(k1, k2, ':', KX[j1, i1], KY[j1, i1])
-    print(k3, k4, ':', KX[j2, i2], KY[j2, i2])
+    #print(k1, k2, ':', KX[j1, i1], KY[j1, i1])
+    #print(k3, k4, ':', KX[j2, i2], KY[j2, i2])
     
     berry_curv_k.append(F1[j1, i1])
     berry_curv_k1.append(F2[j2, i2])
-    
-plt.plot(N, berry_curv_k, c='blue')
-plt.plot(N, berry_curv_k1, c='red')
+    print(F1[j1, i1], F2[j2, i2])
+
+berry_curv_k=np.array(berry_curv_k)
+berry_curv_k1=np.array(berry_curv_k1)   
+plt.plot(NG, berry_curv_k+berry_curv_k1, c='blue', label='K\'')
+plt.ylabel('Berry curvatures')
+plt.xlabel('k-mesh grid division')
+#plt.plot(NG, berry_curv_k1, c='red', label='K')
+plt.legend()
 plt.show()
 
-'''
-radius = 2 * np.pi / a * (2 / 3)
-# Define the region of interest around the K point
-kx_center_K = 2 * np.pi / a * (1 / 3)
-ky_center_K = 2 * np.pi / a * (1 / np.sqrt(3))
-vertices_1 = make_regular_polygon(n, x_centre=kx_center_K, y_centre=ky_center_K, radial=True, rotation_angle=-np.pi/2, radial_distance=radius)
+print(berry_curv_k)
+print(berry_curv_k1)
 
-vertices_1 = np.array(vertices_1)
-vertices_1 = np.vstack((vertices_1, vertices_1[0]))
 
-n = 3
-radius = 2 * np.pi / a * (2 / 3)
-# Define the region of interest around the K point
-kx_center_K_prime = 2 * np.pi / a * (2 / 3)
-ky_center_K_prime = 0
-# ky_center_K_prime = 2 * np.pi / a * (1 / np.sqrt(3))
-vertices_2 = make_regular_polygon(n, x_centre=kx_center_K_prime, y_centre=ky_center_K_prime, radial=True, rotation_angle=np.pi/2, radial_distance=radius)
-vertices_2 = np.array(vertices_2)
-vertices_2 = np.vstack((vertices_2, vertices_2[0]))
-chern_number_calculation_polygon_area(F, KX, KY, a, del_S, vertices_1, vertices_2, kx_center_K, ky_center_K, kx_center_K_prime, ky_center_K_prime)
-
-idx = 0.25
-idy = 0.25
-chern_number_calculation_rectangle_area(F, KX, KY, a, del_S, dx=idx, dy=idy)
-'''
